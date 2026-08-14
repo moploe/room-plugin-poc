@@ -1,0 +1,25 @@
+# Gradle
+.gradle/
+.kotlin/
+build/
+*/build/
+**/build/
+
+# Local config (contains machine-specific SDK path)
+local.properties
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# Android
+*.apk
+*.ap_
+*.dex
+captures/
+.externalNativeBuild/
+.cxx/
