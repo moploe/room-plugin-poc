@@ -157,7 +157,23 @@ object AccountColumns {
 }
 ```
 
-在这些列引用上调用中缀函数拼出 `Where`:
+在这些列引用上调用中缀函数拼出 `Where`。每个运算符的具体含义:
+
+| 运算符 | 全称 / 含义 | 对应 SQL | 例子 |
+|---|---|---|---|
+| `eq` | **equals**,等于 | `col = ?` | `AccountColumns.Name eq "bob"` |
+| `neq` | **not equals**,不等于 | `col != ?` | `AccountColumns.Name neq "bob"` |
+| `gt` | **greater than**,大于 | `col > ?` | `AccountColumns.Id gt 100L` |
+| `gte` | **greater than or equal**,大于等于 | `col >= ?` | `AccountColumns.Id gte 100L` |
+| `lt` | **less than**,小于 | `col < ?` | `AccountColumns.Id lt 100L` |
+| `lte` | **less than or equal**,小于等于 | `col <= ?` | `AccountColumns.Id lte 100L` |
+| `between` | 介于两者之间(闭区间,含两端) | `col BETWEEN ? AND ?` | `AccountColumns.Id.between(100L..200L)` |
+| `like` | 模糊匹配(SQL 的 `LIKE`,`%` 匹配任意长度、`_` 匹配单字符) | `col LIKE ?` | `AccountColumns.Name like "root%"` |
+| `in` | 属于某个集合(**in**,包含在……之中;`in` 是 Kotlin 关键字,要用反引号调用) | `col IN (?, ?, ...)` | `` AccountColumns.Id `in` listOf(1L, 2L, 3L) `` |
+| `isNull` | 为空(是个属性,不是函数,取值直接得到 `Where`) | `col IS NULL` | `AccountColumns.ParentId.isNull` |
+| `isNotNull` | 不为空 | `col IS NOT NULL` | `AccountColumns.ParentId.isNotNull` |
+
+各列类型支持哪些运算符:
 
 | 列类型 | 支持的运算符 |
 |---|---|
@@ -168,7 +184,7 @@ object AccountColumns {
 | `DoubleColumn` / `FloatColumn` | `eq` `neq` `gt` `gte` `lt` `lte` `between` |
 | `BooleanColumn` | `eq` |
 | `ByteArrayColumn` | `eq` |
-| 任意列 | `.isNull` `.isNotNull`(属性,不是函数) |
+| 任意列 | `isNull` `isNotNull` |
 | 枚举字段(生成为 `StringColumn`) | `eq` `neq` `in` 额外支持直接传枚举常量,不用手写 `.name` |
 
 组合条件用 `and` / `or` / `not`:
