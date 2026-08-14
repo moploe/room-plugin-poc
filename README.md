@@ -8,7 +8,7 @@
 2. **类型安全的 Where / Set DSL** —— 用 `AccountColumns.Name eq "bob"` 这种写法拼查询条件,而不是手写 SQL 字符串或者依赖 Room 的 `@Query` 反射校验。
 3. **关系自动抓取(1:1 / 1:N / 多对多 / N 层嵌套)** —— 只要表之间有 `@ForeignKey`,插件就能自动生成"父带子"的批量查询函数,包括 `Flow` 响应式版本,完全不需要你手写 `@Relation` POJO。
 
-> 目前这个仓库还没有发布到 Maven Central,只能作为 Gradle 子模块(`project(":plugin-runtime")` / `project(":plugin-processor")`)接入,见下文「快速接入」。
+> 已发布到 Maven Central:`io.github.moploe:room-plugin-runtime` / `io.github.moploe:room-plugin-processor`,见下文「快速接入」。也可以作为 Gradle 子模块直接接入本仓库源码。
 
 ---
 
@@ -48,14 +48,9 @@
 
 ## 快速接入
 
-在 `settings.gradle.kts` 里把本仓库的 `plugin-runtime`、`plugin-processor` 两个模块 include 进你的项目(或者直接把这两个目录拷到你自己的多模块项目里):
+### 方式一:Maven Central(推荐)
 
-```kotlin
-include(":plugin-runtime")
-include(":plugin-processor")
-```
-
-然后在你要生成代码的模块(比如 `:app`)的 `build.gradle.kts` 里:
+在你要生成代码的模块(比如 `:app`)的 `build.gradle.kts` 里:
 
 ```kotlin
 plugins {
@@ -64,12 +59,16 @@ plugins {
     kotlin("plugin.serialization") // 只有用到第 9 节的默认 JSON 转换器时才需要
 }
 
+repositories {
+    mavenCentral()
+}
+
 dependencies {
     implementation("androidx.room3:room3-runtime:3.0.1")
     ksp("androidx.room3:room3-compiler:3.0.1")
 
-    implementation(project(":plugin-runtime"))
-    ksp(project(":plugin-processor"))
+    implementation("io.github.moploe:room-plugin-runtime:0.1.0")
+    ksp("io.github.moploe:room-plugin-processor:0.1.0")
 }
 
 ksp {
@@ -78,6 +77,17 @@ ksp {
 ```
 
 `kotlin { jvmToolchain(17) }` 也要配上,插件本身是用 17 编译的。
+
+### 方式二:作为 Gradle 子模块接入源码
+
+如果你想改插件本身的代码,或者不想依赖 Maven Central,在 `settings.gradle.kts` 里把本仓库的 `plugin-runtime`、`plugin-processor` 两个模块 include 进你的项目(或者直接把这两个目录拷到你自己的多模块项目里):
+
+```kotlin
+include(":plugin-runtime")
+include(":plugin-processor")
+```
+
+然后依赖那里把 `implementation("io.github.moploe:room-plugin-runtime:0.1.0")` / `ksp("io.github.moploe:room-plugin-processor:0.1.0")` 换成 `implementation(project(":plugin-runtime"))` / `ksp(project(":plugin-processor"))`,其余配置跟方式一一样。
 
 ## 5 分钟上手
 
@@ -470,7 +480,7 @@ ksp {
 - **`@DatabaseView` / FTS 全文搜索** —— 没做。
 - **迁移中的列改名 / 删列 / 改类型** —— 自动迁移只做"新增",这类变更语义上必须人工介入。
 - **独立的 processor 单元测试框架**(kotlin-compile-testing)—— 目前的验证方式是在 `:poc` 模块里用真实 Room 数据库(`BundledSQLiteDriver`)跑集成测试,不是隔离的编译期单测。
-- **发布到 Maven Central / CI / 完整文档站 / iOS-JS-WASM 多平台验证** —— 都还没做,目前只能当 Gradle 子模块接入,只验证过 JVM + Android。
+- **CI / 完整文档站 / iOS-JS-WASM 多平台验证** —— 都还没做,只验证过 JVM + Android(已发布到 Maven Central,见「快速接入」)。
 - **自引用多对多**(同一实体在 junction 表里通过两个外键指向自己,比如"好友关系")—— 处理器会干净地跳过,不生成关系,也不会报错或生成坏代码。
 - **同一对实体之间有多条外键**(比如 `Book` 同时有 `authorId` 和 `editorId` 都指向 `Author`)—— 只有第一条外键会生成关系,第二条会在 KSP 编译日志里打印明确的 warning 说明被跳过了,不是静默失败。
 - **复合主键实体** —— 不能作为关系的起点(1:1/1:N 的父、M:N 的左右两边、嵌套链的根),会被安全地排除在关系代码生成之外,但仍然正常支持 `Where`/`Set` DSL 的增删改查。
