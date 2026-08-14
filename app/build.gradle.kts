@@ -50,6 +50,16 @@ android {
         debug {
             isDebuggable = true
         }
+        // debug-signed (not a real release key) purely so this can be adb-installed to
+        // empirically verify the default JSON @ColumnTypeConverter still round-trips
+        // correctly under R8 minification - see proguard-rules.pro (deliberately left
+        // with no hand-written kotlinx.serialization rules, to prove what actually works
+        // out of the box from the library's own bundled consumer rules).
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 }
 

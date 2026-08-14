@@ -381,6 +381,21 @@ val shipping: Shipping
 
 有显式 `@ColumnTypeConverters` 覆盖的字段所在的实体,不会被算作"可关系化"(因为插件没法知道你的自定义转换逻辑,没法安全地在关系抓取里复用),这类实体拿不到 `get<X>With<Y>List` 之类的关系函数、也拿不到 `query<X>Flow`。只用默认 JSON 转换器(没有覆盖)的实体则完全正常参与关系生成。
 
+#### 混淆(R8/ProGuard)包里还能正确还原成实体类吗?
+
+**能。** 已经用真机 + 真实开启 `isMinifyEnabled = true` 的 release 包(`proguard-rules.pro` 里刻意没写任何 kotlinx.serialization 相关的手动 keep 规则,只依赖它自己内置的 consumer rules)做过端到端实测:写入 `Shipping(address = "221B Baker Street", zip = "NW16XE")`,混淆包里读出来的 JSON 原文是 `{"address":"221B Baker Street","zip":"NW16XE"}`,再通过 `dao.getAllDefault()` 读回来解码,字段值完全正确——加密/解密过程中字段名没有被混淆掉。
+
+原因:
+
+- kotlinx.serialization 是**编译期编译器插件**,`Json.encodeToString`/`decodeFromString` 在 Kotlin 编译阶段(R8 跑之前)就已经被直接接到了为你的 `@Serializable` 类生成的具体 `serializer()` 实现上,不是运行时按类名反射查找——R8 统一改名不会破坏这种"调用点和被调用方法一起改名"的绑定关系。
+- 实际写进 JSON 里的字段名(`address`/`zip`)是编译期就固化成字符串字面量的,来自你 Kotlin 属性的原始名字——R8 的标识符混淆只改类名/方法名/字段名这些符号,不会去改字符串常量的内容,所以 JSON 文本里的 key 名字永远是你写的原始属性名。
+- `kotlinx-serialization-json` 这个依赖自带 consumer proguard rules(打包在它的 jar 里,Gradle/R8 会自动应用),已经帮你 keep 住了生成的 serializer 类,一般不需要你自己再写额外的混淆规则。
+
+但有两个**跟混淆无关、但同样会影响"JSON 还能不能还原成实体类"**的真实风险点,值得一起注意:
+
+- **多态序列化**(sealed class / interface,通过 `SerializersModule` 注册子类型)会在运行时按类名查具体子类型——这种情况下类名混淆是真的会出问题的。本插件目前的默认转换器只处理具体已知类型,不涉及多态,所以这条不适用于插件生成的代码,但如果你自己在 `@Serializable` 字段里用了多态,要自己额外小心。
+- **跨版本字段增删**:默认的 `Json` 实例没有开 `ignoreUnknownKeys`,如果你后续给 `@Serializable` 类加了字段或删了字段,旧版本 App 写入的旧 JSON 用新版本的类解码,遇到"JSON 里有 key 但新类里没有对应属性"会直接抛 `SerializationException`,不是静默兼容——这是数据 schema 演进的问题,不是混淆的问题,但升级版本时容易和混淆问题搞混,一起提一下。
+
 ### 10. @Ignore
 
 标了 `@Ignore` 的属性会被完全排除在生成的 schema(`CREATE TABLE`/`ExpectedColumns`)和 `read<Entity>()` 构造调用之外,和 Room 自己的语义一致——该属性需要在构造函数里有默认值(不然生成的读取代码编译不过,这也是 Room 本身对 `@Ignore` 构造参数的要求)。

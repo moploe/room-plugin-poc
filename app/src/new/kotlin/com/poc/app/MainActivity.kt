@@ -120,6 +120,11 @@ fun Screen() {
                 val id1 = dao.insert(OrderEntity(shipping = Shipping("1 Infinite Loop", "95014")))
                 val id2 = dao.insertDefault(OrderEntityDefault(shipping = Shipping("221B Baker Street", "NW16XE")))
                 push("③ orders.db: custom-converter row id=$id1 (should be 'CUSTOM:' in DB), default-converter row id=$id2 (should be plain JSON)")
+                // read the JSON text back through kotlinx.serialization decode (not just check
+                // the raw stored text) - this is the part that would actually break under R8
+                // if the default converter's generated serializer got obfuscated/stripped.
+                val readBack = dao.getAllDefault().last().shipping
+                push("③ read-back through default JSON converter: address='${readBack.address}', zip='${readBack.zip}' (should match what was inserted)")
             }
         }) { Text("③ 插入订单 (自定义 vs 默认 JSON 转换器)") }
 
